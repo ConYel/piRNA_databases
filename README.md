@@ -7,3 +7,6 @@ Databases in comparison are:
 piRBase v2.0 http://www.regulatoryrna.org/database/piRNA/  
 piRNAdb v1.8 https://www.pirnadb.org/  
 piRNA clusterDB https://www.smallrnagroup.uni-mainz.de/piCdb/
+
+To reproduce the analysis you need to have installed docker.   
+For more information about that please follow the information here: https://www.docker.com/get-started 
