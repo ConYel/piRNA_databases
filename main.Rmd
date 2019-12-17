@@ -1,0 +1,50 @@
+---
+title: "Comparison of piRNA Databases"
+author: "Constantinos Yeles(KG)"
+date: "`r format(Sys.time(), '%a %b %d %Y')`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+## download the databases
+```{bash}
+### 1st download the cluster database 
+wget -P /home/0/piRNA_DBs -c https://www.smallrnagroup.uni-mainz.de/piCdb/data/Homo_sapiens/piRNAclusters.gtf  
+
+### 2nd download the piRNAdb plus clusters
+wget -qO- https://www.pirnadb.org/download/downloadarchive/gff_gtf/pirnadb.v1_7_6.hg38.gff3.zip | zcat >> /home/0/piRNA_DBs/pirnadb.v1_7_6.hg38.gff3
+
+wget -qO- https://www.pirnadb.org/download/downloadarchive/cluster/list_cluster.v1_7_6.hg38.txt.zip | zcat >> /home/0/piRNA_DBs/list_cluster.v1_7_6.hg38.txt
+
+### 3rd download the piRBase 
+wget -qO- http://www.regulatoryrna.org/database/piRNA/download/archive/v2.0/bed/hsa.bed.gz | zcat >> /home/0/piRNA_DBs/piRBase.bed
+
+### 4th download the dashr 
+wget -P /home/0/piRNA_DBs -c http://dashr2.lisanwanglab.org/downloads/dashr.v2.sncRNA.annotation.hg38.bed
+
+```
+### link not working
+In case that is a problem with the links to download, you can download all
+files manually from these links:
+cluster database: https://www.smallrnagroup.uni-mainz.de/piCdb/
+piRNAdb: https://www.pirnadb.org/download/archive/gff_gtf
+piRBase: http://www.regulatoryrna.org/database/piRNA/download.html
+dashr: http://dashr2.lisanwanglab.org/download.php
+
+## load libraries
+```{r message=FALSE, warning=FALSE}
+library(plyranges)
+library(tidyverse)
+```
+
+## load the databases
+```{r}
+piRNA_dbs_files <- list.files("/home/0/piRNA_DBs", full.names = TRUE)
+```
+
+
