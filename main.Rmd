@@ -12,6 +12,7 @@ editor_options:
 ---
 
 ## download the databases
+
 ```{bash}
 ### 1st download the cluster database 
 wget -P /home/0/piRNA_DBs -c https://www.smallrnagroup.uni-mainz.de/piCdb/data/Homo_sapiens/piRNAclusters.gtf  
@@ -26,7 +27,6 @@ wget -qO- http://www.regulatoryrna.org/database/piRNA/download/archive/v2.0/bed/
 
 ### 4th download the dashr 
 wget -P /home/0/piRNA_DBs -c http://dashr2.lisanwanglab.org/downloads/dashr.v2.sncRNA.annotation.hg38.bed
-
 ```
 ### link not working
 In case that is a problem with the links to download, you can download all
