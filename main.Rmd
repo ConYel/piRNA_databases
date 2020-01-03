@@ -107,3 +107,5 @@ pirna_cl_db <- file_pirna_ClDB %>%
   as_granges() %>% 
   arrange(start) %>% 
   keepStandardChromosomes(pruning.mode="coarse")
+  
+```
