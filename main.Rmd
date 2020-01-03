@@ -12,7 +12,6 @@ editor_options:
 ---
 
 ## download the databases
-
 ```{bash}
 ### 1st download the cluster database 
 wget -P /home/0/piRNA_DBs -c https://www.smallrnagroup.uni-mainz.de/piCdb/data/Homo_sapiens/piRNAclusters.gtf  
@@ -44,7 +43,67 @@ library(tidyverse)
 
 ## load the databases
 ```{r}
-piRNA_dbs_files <- list.files("/home/0/piRNA_DBs", full.names = TRUE)
-```
+## find the files of dbs 
+file_piRBase <- list.files("piRNA_DBs", pattern = "hsa.bed", full.names = TRUE)
+file_dashr <- list.files("piRNA_DBs", pattern = "dashr", full.names = TRUE)
+file_pirna_ClDB <- list.files("piRNA_DBs", pattern = "piRNAclusters", full.names = TRUE)
+file_pirnadb <- list.files("piRNA_DBs", pattern = "pirnadb", full.names = TRUE)
+file_pirnadb_cluster <- list.files("piRNA_DBs", pattern = "list_cluster", full.names = TRUE)
 
+## load piRBase
+pirbase <- file_piRBase %>% 
+  read_bed() %>% 
+  as_tibble() %>% 
+  rename(pirbase = "name") %>% 
+  select(-score) %>% 
+  mutate(pirbase_coor = str_c(.$pirbase, .$seqnames, .$start, .$end, .$strand, sep = "_")) %>% 
+  as_granges() %>% 
+  keepStandardChromosomes(pruning.mode="coarse")
 
+## load piRNADB
+pirnadb <- file_pirnadb %>% 
+  read_tsv(comment = "#", col_names = c("seqnames", "x2", "x3",
+                                        "start", "end", "x6", "strand",
+                                        "x7", "piRNAdb" )) %>% 
+  select(-x2, -x3, -x6, -x7) %>% 
+  mutate(seqnames = if_else(seqnames == "chrMT", "chrM", as.character(seqnames))) %>% 
+  mutate(pirnadb_coor = str_c(.$piRNAdb, .$seqnames, .$start, .$end, .$strand, sep = "_")) %>% 
+  as_granges() %>% 
+  arrange(start) %>% 
+  keepStandardChromosomes(pruning.mode="coarse")
+## load piRNADB cluster
+pirnadb_cl <- file_pirnadb_cluster %>% 
+  read_tsv() %>% 
+  select(-Build_Code) %>% 
+  mutate(Strand = if_else(Strand == "biDirectional","*", Strand),
+                                                Chromosome = str_replace(.$Chromosome,"^", "chr")) %>% 
+  as_granges(seqnames = Chromosome,
+             start = Start,
+             end = End, 
+             strand = Strand
+             ) %>% 
+  arrange(start) %>% 
+  keepStandardChromosomes(pruning.mode="coarse")
+#load dashr DB cluster
+dashr_db <- file_dashr %>% 
+  read_tsv(col_names = c("seqnames", 
+                         "start", 
+                         "end", 
+                         "dashr_srna", 
+                         "dashr_type",
+                         "strand")) %>% 
+  mutate(dashr_srna_coor = str_c(.$dashr_srna, .$seqnames, .$start, .$end, .$strand, sep = "_")) %>% 
+  as_granges %>% 
+  arrange(start) %>% 
+  keepStandardChromosomes(pruning.mode="coarse")
+# load cluster db 
+pirna_cl_db <- file_pirna_ClDB %>% 
+  read_gff() %>% 
+  as_tibble %>% 
+  mutate(score = 1:length(.$score),
+         seqnames = str_replace(.$seqnames,"^", "chr")) %>% 
+  unite(cl_db, type:score) %>% 
+  select(-group, -phase, -source) %>% 
+  as_granges() %>% 
+  arrange(start) %>% 
+  keepStandardChromosomes(pruning.mode="coarse")
