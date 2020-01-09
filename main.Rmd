@@ -13,19 +13,20 @@ editor_options:
 
 ## download the databases
 ```{bash}
+mkdir piRNA_DBs
 ### 1st download the cluster database 
-wget -P /home/0/piRNA_DBs -c https://www.smallrnagroup.uni-mainz.de/piCdb/data/Homo_sapiens/piRNAclusters.gtf  
+wget -P ~/piRNA_databases/piRNA_DBs -c https://www.smallrnagroup.uni-mainz.de/piCdb/data/Homo_sapiens/piRNAclusters.gtf  
 
 ### 2nd download the piRNAdb plus clusters
-wget -qO- https://www.pirnadb.org/download/downloadarchive/gff_gtf/pirnadb.v1_7_6.hg38.gff3.zip | zcat >> /home/0/piRNA_DBs/pirnadb.v1_7_6.hg38.gff3
+wget -qO- https://www.pirnadb.org/download/downloadarchive/gff_gtf/pirnadb.v1_7_6.hg38.gff3.zip | zcat >> ~/piRNA_databases/piRNA_DBs/pirnadb.v1_7_6.hg38.gff3
 
-wget -qO- https://www.pirnadb.org/download/downloadarchive/cluster/list_cluster.v1_7_6.hg38.txt.zip | zcat >> /home/0/piRNA_DBs/list_cluster.v1_7_6.hg38.txt
+wget -qO- https://www.pirnadb.org/download/downloadarchive/cluster/list_cluster.v1_7_6.hg38.txt.zip | zcat >> ~/piRNA_databases/piRNA_DBs/list_cluster.v1_7_6.hg38.txt
 
 ### 3rd download the piRBase 
-wget -qO- http://www.regulatoryrna.org/database/piRNA/download/archive/v2.0/bed/hsa.bed.gz | zcat >> /home/0/piRNA_DBs/piRBase.bed
+wget -qO- http://www.regulatoryrna.org/database/piRNA/download/archive/v2.0/bed/hsa.bed.gz | zcat >> ~/piRNA_databases/piRNA_DBs/piRBase.bed
 
 ### 4th download the dashr 
-wget -P /home/0/piRNA_DBs -c http://dashr2.lisanwanglab.org/downloads/dashr.v2.sncRNA.annotation.hg38.bed
+wget -P ~/piRNA_databases/piRNA_DBs -c http://dashr2.lisanwanglab.org/downloads/dashr.v2.sncRNA.annotation.hg38.bed
 ```
 ### link not working
 In case that is a problem with the links to download, you can download all
@@ -37,14 +38,14 @@ dashr: http://dashr2.lisanwanglab.org/download.php
 
 ## load libraries
 ```{r message=FALSE, warning=FALSE}
-library(plyranges)
-library(tidyverse)
+library(plyranges, quietly = TRUE)
+library(tidyverse,  quietly = TRUE)
 ```
 
 ## load the databases
 ```{r}
 ## find the files of dbs 
-file_piRBase <- list.files("piRNA_DBs", pattern = "hsa.bed", full.names = TRUE)
+file_piRBase <- list.files("piRNA_DBs", pattern = "piRBase.bed", full.names = TRUE)
 file_dashr <- list.files("piRNA_DBs", pattern = "dashr", full.names = TRUE)
 file_pirna_ClDB <- list.files("piRNA_DBs", pattern = "piRNAclusters", full.names = TRUE)
 file_pirnadb <- list.files("piRNA_DBs", pattern = "pirnadb", full.names = TRUE)
@@ -84,7 +85,7 @@ pirnadb_cl <- file_pirnadb_cluster %>%
              ) %>% 
   arrange(start) %>% 
   keepStandardChromosomes(pruning.mode="coarse")
-#load dashr DB cluster
+#load dashr DB 
 dashr_db <- file_dashr %>% 
   read_tsv(col_names = c("seqnames", 
                          "start", 
@@ -96,6 +97,7 @@ dashr_db <- file_dashr %>%
   as_granges %>% 
   arrange(start) %>% 
   keepStandardChromosomes(pruning.mode="coarse")
+
 # load cluster db 
 pirna_cl_db <- file_pirna_ClDB %>% 
   read_gff() %>% 
@@ -109,3 +111,158 @@ pirna_cl_db <- file_pirna_ClDB %>%
   keepStandardChromosomes(pruning.mode="coarse")
   
 ```
+
+## collapse the databases
+```{r}
+# pick only the pirnas from dashr ----
+dashr_db_piRNA <- dashr_db %>% filter(dashr_type == "piRNA") %>% select(-dashr_type)
+
+dashr_db_piRNA_red <- dashr_db_piRNA %>% reduce_ranges_directed()
+
+# reduce the pirbase and pirnadb ----
+pirbase_red <- pirbase %>% reduce_ranges_directed()
+
+pirnadb_red <- pirnadb %>% reduce_ranges_directed()
+
+# bind them and reduce
+pirna_DB_union <- c(dashr_db_piRNA_red, pirbase_red, pirnadb_red) %>% 
+  reduce_ranges_directed()
+```
+
+## Evaluation dbs regarding the length of collapsed piRNA sequences
+```{r}
+pirna_DB_union %>% 
+  as_tibble() %>% 
+  group_by(seqnames) %>% 
+  summarise_at(vars(width) ,list(min = min, Q1=~quantile(., probs = 0.25),
+                 median=median, Q3=~quantile(., probs = 0.75),
+                 max=max)) %>% 
+  arrange(as.character(seqnames)) %>% 
+  as.data.frame()
+
+# length statistics and filter of sequences pirbase ----
+pirbase_red %>% 
+  as_tibble() %>% 
+  group_by(seqnames) %>% 
+  summarise_at(vars(width) ,list(min = min, Q1=~quantile(., probs = 0.25),
+                 median=median, Q3=~quantile(., probs = 0.75),
+                 max=max)) %>% 
+  arrange(as.character(seqnames)) %>% 
+  as.data.frame()
+# evaluating summary statistics we find that most of the regions
+# that are around ~ 34 base pairs for that reason we will remove 
+# all regions longer than 39
+pirbase_short <- pirbase_red %>% 
+  keepStandardChromosomes(pruning.mode="coarse") %>% 
+  as_tibble() %>% 
+  filter(width < 40)
+# length statistics and filter of sequences dashr ----
+dashr_db_piRNA_red %>% 
+  as_tibble() %>% 
+  group_by(seqnames) %>% 
+  summarise_at(vars(width) ,list(min = min, Q1=~quantile(., probs = 0.25),
+                                 median=median, Q3=~quantile(., probs = 0.75),
+                                 max=max)) %>% 
+  arrange(as.character(seqnames)) %>% 
+  as.data.frame()
+# remove all regions longer than 39 in dashr
+dashr_db_piRNA_short <- dashr_db_piRNA_red %>% 
+  as_tibble() %>% 
+  filter(width < 40)
+# length statistics and filter of sequences pirnadb ----
+pirnadb_red %>% 
+  as_tibble() %>% 
+  group_by(seqnames) %>% 
+  summarise_at(vars(width) ,list(min = min, Q1=~quantile(., probs = 0.25),
+                                 median=median, Q3=~quantile(., probs = 0.75),
+                                 max=max)) %>% 
+  arrange(as.character(seqnames)) %>% 
+  as.data.frame()
+# remove all regions longer than 39 in pirnadb
+pirnadb_short <- pirnadb_red %>% 
+  keepStandardChromosomes(pruning.mode="coarse") %>% 
+  as_tibble() %>% 
+  filter(width < 40)
+# concat them and reduce
+cpiRNA_DB <- c(as_granges(dashr_db_piRNA_short), 
+                    as_granges(pirbase_short), 
+                    as_granges(pirnadb_short)) %>% 
+  reduce_ranges_directed() %>%
+  as_tibble() %>%  
+  mutate(rnaID = 1:length(.$strand) %>% str_c("cpiRNA", .)) %>% 
+  as_granges()
+
+cpiRNA_DB %>% 
+  as_tibble() %>% 
+  group_by(seqnames) %>% 
+  summarise_at(vars(width) ,list(min = min, Q1=~quantile(., probs = 0.25),
+                                 median=median, Q3=~quantile(., probs = 0.75),
+                                 max=max)) %>% 
+  arrange(as.character(seqnames)) %>% 
+   as.data.frame()
+```
+
+## find gene / transcript regions, functions-----
+```{r}
+# load libraries -----
+library(TxDb.Hsapiens.UCSC.hg38.knownGene, quietly = TRUE)
+library(org.Hs.eg.db, quietly = TRUE)
+library(bumphunter, quietly = TRUE)
+library(BiocParallel, quietly = TRUE)
+# import regions of transcripts ----
+txd <- TxDb.Hsapiens.UCSC.hg38.knownGene
+genes <- annotateTranscripts(TxDb.Hsapiens.UCSC.hg38.knownGene,annotation="org.Hs.eg.db") %>% 
+  keepStandardChromosomes(pruning.mode="coarse")
+# make a function to use it in BIOcparallel -----
+fun <- function(v){
+  message("working")
+  matchGenes(v, genes, type = "any", promoterDist = 2500, skipExons = FALSE, verbose = TRUE) %>% as_tibble()
+}
+# function to slice the dataset ----
+slice_DF_chr_fun <- function(list_of_chr, chr_name, threads, by_n){
+  length_chr <- plyr::round_any(length(list_of_chr[[chr_name]]), by_n, ceiling)
+  
+  message("length_chr = ", length_chr)
+  message("chunks = ", length_chr %/% threads)
+  
+  chunks_chr_start <- seq(1,length_chr, by = length_chr %/% threads)
+  
+  message("chunks start = ", str_glue("{chunks_chr_start} "))
+  
+  chunks_chr_end <- c(chunks_chr_start[2:length(chunks_chr_start)]-1,length(list_of_chr[[chr_name]]))
+  message("chunks end = ", str_glue("{chunks_chr_end} "))
+  
+  chunk_list <- map2(chunks_chr_start, chunks_chr_end, ~ list_of_chr[[chr_name]][.x:.y])
+  chunk_list
+}
+# function to annotate for each sliced chr ----
+annotate_fun <- function(sliced_list_chr, threads) { 
+  mt_param <- MulticoreParam(workers = threads)
+  genes_chr <- bplapply(sliced_list_chr, fun, BPPARAM = mt_param)
+  message("bind the ranges")
+  sliced_list_chr <- bind_ranges(sliced_list_chr)
+  message("make the final tibble")
+  genes_chr <- genes_chr %>%
+    bind_rows() %>% 
+    bind_cols(as_tibble(sliced_list_chr)) %>% 
+    dplyr::select(name:subjectHits,rnaID)
+  genes_chr
+}
+
+# function umbrella ------
+transcript_genes_snRNA <- function(chr_list, name_chr, proc, n){
+  res <- slice_DF_chr_fun(chr_list, name_chr, proc, n)
+  annotate_fun(res, proc)
+}
+
+```
+## add the transcript information
+```{r}
+# divide the collapsed ranges per chromosome ----
+my_chrs <- seqlevels(cpiRNA_DB) %>% purrr::set_names()
+cpiRNA_DB_chr <- map(my_chrs, ~ cpiRNA_DB  %>% 
+                     filter(seqnames == .x))
+
+# run for each chr the umbrella function ----
+```
+
