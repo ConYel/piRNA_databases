@@ -222,16 +222,19 @@ fun <- function(v){
 slice_DF_chr_fun <- function(list_of_chr, chr_name, threads, by_n){
   length_chr <- plyr::round_any(length(list_of_chr[[chr_name]]), by_n, ceiling)
   
-  message("length_chr = ", length_chr)
-  message("chunks = ", length_chr %/% threads)
+  message("ceiling length_chr = ", length_chr)
+  message("length chromosome = ", length(list_of_chr[[chr_name]]))
+  message("number of chunk entries = ", length_chr %/% threads)
   
   chunks_chr_start <- seq(1,length_chr, by = length_chr %/% threads)
-  
+  if (length(chunks_chr_start) != threads) {
+    chunks_chr_start <- chunks_chr_start[1:threads]
+  }
   message("chunks start = ", str_glue("{chunks_chr_start} "))
   
-  chunks_chr_end <- c(chunks_chr_start[2:length(chunks_chr_start)]-1,length(list_of_chr[[chr_name]]))
+  chunks_chr_end <- c(chunks_chr_start[2:length(chunks_chr_start)]-1, length(list_of_chr[[chr_name]]))
   message("chunks end = ", str_glue("{chunks_chr_end} "))
-  
+
   chunk_list <- map2(chunks_chr_start, chunks_chr_end, ~ list_of_chr[[chr_name]][.x:.y])
   chunk_list
 }
@@ -249,10 +252,14 @@ annotate_fun <- function(sliced_list_chr, threads) {
   genes_chr
 }
 
+identical(length(p_DB_U_chr[[2]]), length(bind_ranges(test25_chr10)))
 # function umbrella ------
 transcript_genes_snRNA <- function(chr_list, name_chr, proc, n){
-  res <- slice_DF_chr_fun(chr_list, name_chr, proc, n)
-  annotate_fun(res, proc)
+  res_list_1 <- slice_DF_chr_fun(chr_list, name_chr, proc, n)
+  
+    if (identical(length(chr_list[[name_chr]]), length(bind_ranges(res_list_1)))) {
+    res_list_2 <- annotate_fun(res_list_1, proc)
+    }
 }
 
 ```
@@ -260,9 +267,17 @@ transcript_genes_snRNA <- function(chr_list, name_chr, proc, n){
 ```{r}
 # divide the collapsed ranges per chromosome ----
 my_chrs <- seqlevels(cpiRNA_DB) %>% purrr::set_names()
+cpiRNA_DB %>% as_tibble %>% group_by(seqnames) %>% summarise(n=dplyr::n())
 cpiRNA_DB_chr <- map(my_chrs, ~ cpiRNA_DB  %>% 
                      filter(seqnames == .x))
 
 # run for each chr the umbrella function ----
+
+res <- transcript_genes_snRNA(cpiRNA_DB_chr,"chrM", 10, 10)
+lapply(list("chr21", "chr22", "chrY"), 
+       function(x)transcript_genes_snRNA(cpiRNA_DB_chr, x, 14, 100))
+
+res <- slice_DF_chr_fun(pirna_DB_union_chr,"chrM", 10, 10)
+annotate_fun(res, 10)
 ```
 
