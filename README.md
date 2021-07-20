@@ -1,7 +1,7 @@
 # Comparing existing piRNA databases 
  
 In this project we compare piRNA databases that have been updated   
-recently so as understand the main differences and how can be utilised.  
+recently so as to understand the main differences and how can be utilised.  
 
 Databases in comparison are:  
 piRBase v2.0 http://www.regulatoryrna.org/database/piRNA/  
